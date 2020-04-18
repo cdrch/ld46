@@ -8,4 +8,5 @@ edition = "2018"
 
 [dependencies]
 tetra = "0.3"
+legion = "0.2.1"
 rand = "0.7.3"
