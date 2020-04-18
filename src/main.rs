@@ -24,35 +24,6 @@ fn main() -> tetra::Result {
 
 // === ECS Management ===
 
-pub struct Engine {
-    universe: Universe,
-    pub world: World,
-    pub executor: Executor,
-    pub resources: Resources,
-}
-
-impl Engine {
-    pub fn new() -> Self {
-        let universe = Universe::new();
-        let mut world = universe.create_world();
-        let executor = Executor::new(vec![]);
-        let mut resources = Resources::default();
-
-        Engine {
-            universe,
-            world,
-            executor,
-            resources,
-        }
-    }
-
-    pub fn set_systems(&mut self, systems: Vec<Box<dyn Schedulable>>) {
-        self.executor = Executor::new(systems);
-    }
-
-
-}
-
 #[derive(Debug, PartialEq)]
 struct EntityInfo {
     name: str,
@@ -76,8 +47,8 @@ struct Static;
 // === Scene Management ===
 
 trait Scene {
-    fn update(&mut self, ctx: &mut Context) -> tetra::Result<Transition>;
-    fn draw(&mut self, ctx: &mut Context) -> tetra::Result<Transition>;
+    fn update(&mut self, ctx: &mut Context, world: &mut World) -> tetra::Result<Transition>;
+    fn draw(&mut self, ctx: &mut Context, world: &mut World) -> tetra::Result<Transition>;
 }
 
 enum Transition {
@@ -87,15 +58,30 @@ enum Transition {
 }
 
 struct GameState {
+    universe: Universe,
+    pub world: World,
+    pub executor: Executor,
+    pub resources: Resources,
+
     scenes: Vec<Box<dyn Scene>>,
     scaler: ScreenScaler,
 }
 
 impl GameState {
     fn new(ctx: &mut Context) -> tetra::Result<GameState> {
-        let initial_scene = TestScene::new(ctx)?;
+        let universe = Universe::new();
+        let mut world = universe.create_world();
+        let executor = Executor::new(vec![]);
+        let mut resources = Resources::default();
+
+
+        let initial_scene = TestScene::new(ctx, &mut world)?;
 
         Ok(GameState {
+            universe,
+            world,
+            executor,
+            resources,
             scenes: vec![Box::new(initial_scene)],
             scaler: ScreenScaler::with_window_size(
                 ctx,
@@ -105,12 +91,16 @@ impl GameState {
             )?,
         })
     }
+
+    pub fn set_systems(&mut self, systems: Vec<Box<dyn Schedulable>>) {
+        self.executor = Executor::new(systems);
+    }
 }
 
 impl State for GameState {
     fn update(&mut self, ctx: &mut Context) -> tetra::Result {
         match self.scenes.last_mut() {
-            Some(active_scene) => match active_scene.update(ctx)? {
+            Some(active_scene) => match active_scene.update(ctx, &mut self.world)? {
                 Transition::None => {}
                 Transition::Push(s) => {
                     self.scenes.push(s);
@@ -128,7 +118,7 @@ impl State for GameState {
     fn draw(&mut self, ctx: &mut Context) -> tetra::Result {
         graphics::set_canvas(ctx, self.scaler.canvas());
         match self.scenes.last_mut() {
-            Some(active_scene) => match active_scene.draw(ctx)? {
+            Some(active_scene) => match active_scene.draw(ctx, &mut self.world)? {
                 Transition::None => {}
                 Transition::Push(s) => {
                     self.scenes.push(s);
@@ -164,10 +154,7 @@ struct TestScene {
 }
 
 impl TestScene {
-    fn new(ctx: &mut Context) -> tetra::Result<TestScene> {
-        // Create a world to store our entities
-        let universe = Universe::new();
-        let mut world = universe.create_world();
+    fn new(ctx: &mut Context, world: &mut World) -> tetra::Result<TestScene> {
 
         // Create entities with `Position` and `Velocity` data
         world.insert(
@@ -195,24 +182,32 @@ impl TestScene {
 }
 
 impl Scene for TestScene {
-    fn update(&mut self, ctx: &mut Context) -> tetra::Result<Transition> {
+    fn update(&mut self, ctx: &mut Context, mut world: &mut World) -> tetra::Result<Transition> {
         if input::is_key_pressed(ctx, Key::Space) {
-            return Ok(Transition::Push(Box::new(TestScene2::new(ctx)?)));
+            return Ok(Transition::Push(Box::new(TestScene2::new(ctx,world)?)));
         }
 
         // Create a query which finds all `Position` and `Velocity` components
         let mut query = <(Write<Position>, Read<Health>)>::query();
 
+        let mut a = 0;
+        let mut b = 0;
         // Iterate through all entities that match the query in the world
         for (mut pos, hel) in query.iter_mut(&mut world) {
             pos.x += 1;
             pos.y += 1;
+            a += pos.x;
+            b += pos.y;
         }
+
+        
+        self.test_text.content_mut().push_str(&"\n".to_string());
+        self.test_text.content_mut().push_str(&a.to_string());
 
         Ok(Transition::None)
     }
 
-    fn draw(&mut self, ctx: &mut Context) -> tetra::Result<Transition> {
+    fn draw(&mut self, ctx: &mut Context, world: &mut World) -> tetra::Result<Transition> {
         graphics::clear(ctx, Color::rgb(0.094, 0.11, 0.16));
 
         graphics::draw(ctx, &self.title_text, Vec2::new(16.0, 16.0));
@@ -230,7 +225,7 @@ struct TestScene2 {
 }
 
 impl TestScene2 {
-    fn new(ctx: &mut Context) -> tetra::Result<TestScene2> {
+    fn new(ctx: &mut Context, world: &mut World) -> tetra::Result<TestScene2> {
         Ok(TestScene2 {
             title_text: Text::new("Test Scene 2", Font::default(), 72.0),
             test_text: Text::new("This is some test text.\n\nYay Ludum Dare!\nThe 46th one!\nThat's this one!\nWill I succeed?\nI better.\n\nHere we go...", Font::default(), 32.0),
@@ -239,15 +234,15 @@ impl TestScene2 {
 }
 
 impl Scene for TestScene2 {
-    fn update(&mut self, ctx: &mut Context) -> tetra::Result<Transition> {
+    fn update(&mut self, ctx: &mut Context, mut world: &mut World) -> tetra::Result<Transition> {
         if input::is_key_pressed(ctx, Key::Space) {
-            Ok(Transition::Push(Box::new(TestScene::new(ctx)?)))
+            Ok(Transition::Push(Box::new(TestScene::new(ctx, &mut world)?)))
         } else {
             Ok(Transition::None)
         }
     }
 
-    fn draw(&mut self, ctx: &mut Context) -> tetra::Result<Transition> {
+    fn draw(&mut self, ctx: &mut Context, world: &mut World) -> tetra::Result<Transition> {
         graphics::clear(ctx, Color::rgb(0.094, 0.11, 0.16));
 
         graphics::draw(ctx, &self.title_text, Vec2::new(16.0, 16.0));
