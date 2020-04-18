@@ -1,3 +1,4 @@
+use legion::prelude::*;
 use rand::{self, Rng};
 use tetra::audio::Sound;
 use tetra::graphics::scaling::{ScalingMode, ScreenScaler};
@@ -20,6 +21,28 @@ fn main() -> tetra::Result {
         .build()?
         .run(GameState::new)
 }
+
+// === ECS Management ===
+
+#[derive(Debug, PartialEq)]
+struct EntityInfo {
+    name: str,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Position {
+    x: i32,
+    y: i32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Health {
+    hp: i32,
+    last_damaged_by: i32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Static;
 
 // === Scene Management ===
 
@@ -75,7 +98,6 @@ impl State for GameState {
 
     fn draw(&mut self, ctx: &mut Context) -> tetra::Result {
         graphics::set_canvas(ctx, self.scaler.canvas());
-        
         match self.scenes.last_mut() {
             Some(active_scene) => match active_scene.draw(ctx)? {
                 Transition::None => {}
@@ -114,6 +136,27 @@ struct TestScene {
 
 impl TestScene {
     fn new(ctx: &mut Context) -> tetra::Result<TestScene> {
+        // Create a world to store our entities
+        let universe = Universe::new();
+        let mut world = universe.create_world();
+
+        // Create entities with `Position` and `Velocity` data
+        world.insert(
+            (),
+            (0..999).map(|_| {
+                (
+                    Position { x: 0, y: 0 },
+                    Health {
+                        hp: 0,
+                        last_damaged_by: 0,
+                    },
+                )
+            }),
+        );
+
+        // Create entities with `Position` data and a tagged with `Model` data and as `Static`
+        // Tags are shared across many entities, and enable further batch processing and filtering use cases
+        world.insert((Static,), (0..999).map(|_| (Position { x: 0, y: 0 },)));
 
         Ok(TestScene {
             title_text: Text::new("Test Scene", Font::default(), 72.0),
@@ -128,6 +171,15 @@ impl Scene for TestScene {
             Ok(Transition::Push(Box::new(TestScene2::new(ctx)?)))
         } else {
             Ok(Transition::None)
+        }
+
+        // Create a query which finds all `Position` and `Velocity` components
+        let mut query = <(Write<Position>, Read<Health>)>::query();
+
+        // Iterate through all entities that match the query in the world
+        for (mut pos, vel) in query.iter(&mut world) {
+            pos.x += vel.dx;
+            pos.y += vel.dy;
         }
     }
 
@@ -150,7 +202,6 @@ struct TestScene2 {
 
 impl TestScene2 {
     fn new(ctx: &mut Context) -> tetra::Result<TestScene2> {
-
         Ok(TestScene2 {
             title_text: Text::new("Test Scene 2", Font::default(), 72.0),
             test_text: Text::new("This is some test text.\n\nYay Ludum Dare!\nThe 46th one!\nThat's this one!\nWill I succeed?\nI better.\n\nHere we go...", Font::default(), 32.0),
