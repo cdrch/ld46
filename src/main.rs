@@ -125,6 +125,42 @@ impl TestScene {
 impl Scene for TestScene {
     fn update(&mut self, ctx: &mut Context) -> tetra::Result<Transition> {
         if input::is_key_pressed(ctx, Key::Space) {
+            Ok(Transition::Push(Box::new(TestScene2::new(ctx)?)))
+        } else {
+            Ok(Transition::None)
+        }
+    }
+
+    fn draw(&mut self, ctx: &mut Context) -> tetra::Result<Transition> {
+        graphics::clear(ctx, Color::rgb(0.094, 0.11, 0.16));
+
+        graphics::draw(ctx, &self.title_text, Vec2::new(16.0, 16.0));
+        graphics::draw(ctx, &self.test_text, Vec2::new(16.0, 96.0));
+
+        Ok(Transition::None)
+    }
+}
+
+// === Test Scene 2 ===
+
+struct TestScene2 {
+    title_text: Text,
+    test_text: Text,
+}
+
+impl TestScene2 {
+    fn new(ctx: &mut Context) -> tetra::Result<TestScene2> {
+
+        Ok(TestScene2 {
+            title_text: Text::new("Test Scene 2", Font::default(), 72.0),
+            test_text: Text::new("This is some test text.\n\nYay Ludum Dare!\nThe 46th one!\nThat's this one!\nWill I succeed?\nI better.\n\nHere we go...", Font::default(), 32.0),
+        })
+    }
+}
+
+impl Scene for TestScene2 {
+    fn update(&mut self, ctx: &mut Context) -> tetra::Result<Transition> {
+        if input::is_key_pressed(ctx, Key::Space) {
             Ok(Transition::Push(Box::new(TestScene::new(ctx)?)))
         } else {
             Ok(Transition::None)
