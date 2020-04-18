@@ -44,6 +44,27 @@ struct Health {
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Static;
 
+pub fn create_systems() -> Vec<Box<dyn Schedulable>> {
+    vec![
+        // input_system(),
+        // move_system(),
+        // spawn_enemy_system(),
+        // collider_system(),
+        simple_test_system(),
+    ]
+}
+
+pub fn simple_test_system() -> Box<dyn Schedulable> {
+    SystemBuilder::<()>::new("MoveSystem")
+        .with_query(<(Write<Position>)>::query())
+        .build(move |_commands, world, _resource, queries| {
+            for (_entity, mut pos) in queries.iter_entities_mut(&mut *world) {
+                pos.x += 1;
+                pos.y += 1;
+            } 
+        })
+}
+
 // === Scene Management ===
 
 trait Scene {
@@ -99,6 +120,8 @@ impl GameState {
 
 impl State for GameState {
     fn update(&mut self, ctx: &mut Context) -> tetra::Result {
+        self.executor.execute(&mut self.world, &mut self.resources);
+
         match self.scenes.last_mut() {
             Some(active_scene) => match active_scene.update(ctx, &mut self.world)? {
                 Transition::None => {}
@@ -187,22 +210,16 @@ impl Scene for TestScene {
             return Ok(Transition::Push(Box::new(TestScene2::new(ctx,world)?)));
         }
 
-        // Create a query which finds all `Position` and `Velocity` components
-        let mut query = <(Write<Position>, Read<Health>)>::query();
+        for (_entity) in world.iter_entities() {
+            if (self.test_text.content().len() > 100) {
+                self.test_text.set_content("");
+            }
 
-        let mut a = 0;
-        let mut b = 0;
-        // Iterate through all entities that match the query in the world
-        for (mut pos, hel) in query.iter_mut(&mut world) {
-            pos.x += 1;
-            pos.y += 1;
-            a += pos.x;
-            b += pos.y;
-        }
-
+            self.test_text.content_mut().push_str(&"\n".to_string());
+            self.test_text.content_mut().push_str(&_entity.to_string());  
+        } 
         
-        self.test_text.content_mut().push_str(&"\n".to_string());
-        self.test_text.content_mut().push_str(&a.to_string());
+
 
         Ok(Transition::None)
     }
