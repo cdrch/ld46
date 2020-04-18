@@ -24,6 +24,35 @@ fn main() -> tetra::Result {
 
 // === ECS Management ===
 
+pub struct Engine {
+    universe: Universe,
+    pub world: World,
+    pub executor: Executor,
+    pub resources: Resources,
+}
+
+impl Engine {
+    pub fn new() -> Self {
+        let universe = Universe::new();
+        let mut world = universe.create_world();
+        let executor = Executor::new(vec![]);
+        let mut resources = Resources::default();
+
+        Engine {
+            universe,
+            world,
+            executor,
+            resources,
+        }
+    }
+
+    pub fn set_systems(&mut self, systems: Vec<Box<dyn Schedulable>>) {
+        self.executor = Executor::new(systems);
+    }
+
+
+}
+
 #[derive(Debug, PartialEq)]
 struct EntityInfo {
     name: str,
@@ -168,19 +197,19 @@ impl TestScene {
 impl Scene for TestScene {
     fn update(&mut self, ctx: &mut Context) -> tetra::Result<Transition> {
         if input::is_key_pressed(ctx, Key::Space) {
-            Ok(Transition::Push(Box::new(TestScene2::new(ctx)?)))
-        } else {
-            Ok(Transition::None)
+            return Ok(Transition::Push(Box::new(TestScene2::new(ctx)?)));
         }
 
         // Create a query which finds all `Position` and `Velocity` components
         let mut query = <(Write<Position>, Read<Health>)>::query();
 
         // Iterate through all entities that match the query in the world
-        for (mut pos, vel) in query.iter(&mut world) {
-            pos.x += vel.dx;
-            pos.y += vel.dy;
+        for (mut pos, hel) in query.iter_mut(&mut world) {
+            pos.x += 1;
+            pos.y += 1;
         }
+
+        Ok(Transition::None)
     }
 
     fn draw(&mut self, ctx: &mut Context) -> tetra::Result<Transition> {
