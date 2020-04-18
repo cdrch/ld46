@@ -25,8 +25,8 @@ fn main() -> tetra::Result {
 // === ECS Management ===
 
 #[derive(Debug, PartialEq)]
-struct EntityInfo {
-    name: str,
+struct EntityInfo<'a> {
+    name: &'a str,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -179,23 +179,23 @@ struct TestScene {
 impl TestScene {
     fn new(ctx: &mut Context, world: &mut World) -> tetra::Result<TestScene> {
 
-        // Create entities with `Position` and `Velocity` data
+        // create the player
         world.insert(
-            (),
-            (0..999).map(|_| {
-                (
-                    Position { x: 0, y: 0 },
-                    Health {
-                        hp: 0,
-                        last_damaged_by: 0,
-                    },
-                )
-            }),
+            (), // no tags for now
+            vec![
+                (EntityInfo {
+                    name: "Player",
+                },
+                Position {
+                    x: 0,
+                    y: 0,
+                },
+                Health {
+                    hp: 100,
+                    last_damaged_by: 0,
+                })
+            ]
         );
-
-        // Create entities with `Position` data and a tagged with `Model` data and as `Static`
-        // Tags are shared across many entities, and enable further batch processing and filtering use cases
-        world.insert((Static,), (0..999).map(|_| (Position { x: 0, y: 0 },)));
 
         Ok(TestScene {
             title_text: Text::new("Test Scene", Font::default(), 72.0),
